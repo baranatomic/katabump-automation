@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
 
 const LOGIN_URL = 'https://dashboard.katabump.com/auth/login';
 const DASHBOARD_URL = 'https://dashboard.katabump.com/dashboard';
@@ -12,12 +13,71 @@ if (!email || !password) {
   );
 }
 
+await fs.mkdir('artifacts', {
+  recursive: true
+});
+
 const browser = await chromium.launch({
   headless: true
 });
 
-const context = await browser.newContext();
+const context = await browser.newContext({
+  viewport: {
+    width: 1366,
+    height: 768
+  }
+});
+
 const page = await context.newPage();
+
+async function saveDebugInfo() {
+  console.log('');
+  console.log('=================================');
+  console.log('SAVING DEBUG INFORMATION');
+  console.log('=================================');
+
+  try {
+    console.log(`URL: ${page.url()}`);
+
+    const title = await page.title();
+    console.log(`Title: ${title}`);
+
+    await page.screenshot({
+      path: 'artifacts/login-page.png',
+      fullPage: true
+    });
+
+    console.log('Screenshot saved: artifacts/login-page.png');
+
+    const html = await page.content();
+
+    await fs.writeFile(
+      'artifacts/login-page.html',
+      html,
+      'utf8'
+    );
+
+    console.log('HTML saved: artifacts/login-page.html');
+
+    const bodyText = await page.locator('body').innerText({
+      timeout: 5000
+    }).catch(() => '');
+
+    await fs.writeFile(
+      'artifacts/login-page.txt',
+      bodyText,
+      'utf8'
+    );
+
+    console.log('Text saved: artifacts/login-page.txt');
+
+  } catch (debugError) {
+    console.error(
+      'Could not save all debug information:',
+      debugError
+    );
+  }
+}
 
 try {
   console.log('Opening KataBump login page...');
@@ -27,12 +87,18 @@ try {
     timeout: 30000
   });
 
+  console.log(`Current URL: ${page.url()}`);
+
+  console.log(`Page title: ${await page.title()}`);
+
   console.log('Waiting for login form...');
 
   await page.locator('#login-form').waitFor({
     state: 'visible',
     timeout: 15000
   });
+
+  console.log('Login form is visible.');
 
   console.log('Filling email...');
 
@@ -41,13 +107,6 @@ try {
   console.log('Filling password...');
 
   await page.locator('#password').fill(password);
-
-  /*
-   * KataBump uses Cloudflare Turnstile.
-   *
-   * We do not create, forge, inject, or bypass a Turnstile token.
-   * We simply wait for the widget to produce its response normally.
-   */
 
   console.log('Waiting for Cloudflare Turnstile...');
 
@@ -59,6 +118,8 @@ try {
     state: 'attached',
     timeout: 15000
   });
+
+  console.log('Turnstile element found.');
 
   await page.waitForFunction(() => {
     const input = document.querySelector(
@@ -102,10 +163,14 @@ try {
   console.error('=================================');
   console.error('LOGIN_FAILED');
   console.error('=================================');
+
   console.error(`Current URL: ${page.url()}`);
+
   console.error('');
+
   console.error(error);
-  console.error('');
+
+  await saveDebugInfo();
 
   throw error;
 
