@@ -1,0 +1,13 @@
+{
+  "name": "katabump-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "KataBump automation with Playwright and GitHub Actions",
+  "type": "module",
+  "scripts": {
+    "login": "node src/login.js"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}
